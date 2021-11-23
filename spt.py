@@ -10,11 +10,10 @@ from matplotlib.widgets import Slider
 import matplotlib.pylab as pl
 from multiprocessing import Pool
 import numpy as np
-from pims import TiffStack, open
+from pims import TiffStack
 import matplotlib.pyplot as plt
 from scipy.interpolate import splprep, splev
 import os
-import shutil
 import trackpy as tp
 import pandas as pd
 import glob
@@ -28,22 +27,23 @@ Tracking
 class SPT:
     """
 
+    Movie parameters:
+
+    direc              path of .tif stack file
+    startFrame         first frame to take into consideration for analysis
+    endFrame           last frame to take into consideration for analysis
+    roi                coordinates defining the roi. Output from def_roi() function, which can be saved as a .txt file
+                       and reimported
+
+
     Tracking parameters:
 
     dist               search_range parameter for trackpy, distance a particle can move between frames in pixels
     featSize           diameter parameter for trackpy, approx. feature size
-    maxsize            maxsize parameter for trackpy
     memory             memory parameter for trackpy
-    minTrackLength     minimum track length for trackpy (func filter_stubs)
+    mtl                minimum track length for trackpy (func filter_stubs)
     threshold          minmass parameter for trackpy
-
-
-    Movie parameters:
-
-    direc              path of .tif stack file
-    endFrame
-    startFrame         first frame to take into consideration for analysis
-    coors
+    separation         separation parameter for trackpy
 
 
     Computation:
@@ -51,6 +51,10 @@ class SPT:
     cores              number of parallel processes to be started if parallel is true
     parallel           boolean, to run tracking on more than one core
 
+
+    Results:
+
+    save_path          path to save the results (will create a file called trajectories.csv)
 
 
     """

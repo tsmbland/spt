@@ -12,7 +12,7 @@ from multiprocessing import Pool
 import numpy as np
 from pims import TiffStack
 import matplotlib.pyplot as plt
-from scipy.interpolate import splprep, splev
+from scipy.interpolate import splprep, splev, interp1d
 import os
 import trackpy as tp
 import pandas as pd
@@ -1006,8 +1006,6 @@ def interp_roi(roi, periodic=True):
     Interpolates coordinates to one pixel distances (or as close as possible to one pixel)
     Linear interpolation
 
-    Ability to specify number of points
-
     :param roi:
     :return:
     """
@@ -1019,18 +1017,14 @@ def interp_roi(roi, periodic=True):
 
     # Calculate distance between points in pixel units
     distances = ((np.diff(c[:, 0]) ** 2) + (np.diff(c[:, 1]) ** 2)) ** 0.5
-    distances_cumsum = np.append([0], np.cumsum(distances))
-    px = sum(distances) / round(sum(distances))  # effective pixel size
-    newpoints = np.zeros((int(round(sum(distances))), 2))
-    newcoors_distances_cumsum = 0
+    distances_cumsum = np.r_[0, np.cumsum(distances)]
+    total_length = sum(distances)
 
-    for d in range(int(round(sum(distances)))):
-        index = sum(distances_cumsum - newcoors_distances_cumsum <= 0) - 1
-        newpoints[d, :] = (
-                roi[index, :] + ((newcoors_distances_cumsum - distances_cumsum[index]) / distances[index]) * (
-                c[index + 1, :] - c[index, :]))
-        newcoors_distances_cumsum += px
-
+    # Interpolate
+    fx, fy = interp1d(distances_cumsum, c[:, 0], kind='linear'), interp1d(distances_cumsum, c[:, 1], kind='linear')
+    positions = np.linspace(0, total_length, int(round(total_length)))
+    xcoors, ycoors = fx(positions), fy(positions)
+    newpoints = np.c_[xcoors[:-1], ycoors[:-1]]
     return newpoints
 
 

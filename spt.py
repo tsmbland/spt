@@ -60,7 +60,7 @@ class SPT:
     """
 
     def __init__(self, direc=None, roi=None, threshold=600, feat_size=5, dist=5, separation=None, memory=3, mtl=50,
-                 start_frame=0, end_frame=None, parallel=False, cores=None, save_path=None):
+                 start_frame=0, end_frame=None, parallel=False, cores=None, save_path=None, invert_roi=False):
 
         # Import data
         self.direc = direc
@@ -86,7 +86,7 @@ class SPT:
         # ROI
         self.ROI = roi
         self.ROI_original = roi
-        self.ROI_invert = False
+        self.ROI_invert = invert_roi
 
         # Computation
         self.cores = cores
@@ -102,7 +102,8 @@ class SPT:
 
     def run(self):
         self.find_feats()
-        self.apply_roi()
+        if self.ROI is not None:
+            self.apply_roi()
         self.link_feats()
         self.save()
 

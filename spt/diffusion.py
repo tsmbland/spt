@@ -1,14 +1,7 @@
-import os
-import sys
-
-sys.path.append(os.path.dirname(os.path.realpath(__file__)))
-
-# from spt import *
 import numpy as np
 import pandas as pd
 import trackpy as tp
 from scipy.optimize import curve_fit
-import matplotlib.pyplot as plt
 import copy
 
 """

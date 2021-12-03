@@ -2,10 +2,11 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.widgets import Slider
 from scipy.interpolate import splprep, splev, interp1d
+from matplotlib.widgets import Button
+import ipywidgets as widgets
 
 """
 This no longer works with multiple channels - intensity ranges
-Need a version that works in notebooks
 Ability to specify a directory and open all channels. Or an nd file
 
 """
@@ -35,14 +36,14 @@ class ROI:
 
         # Detect if single frame or stack
         if type(img) is list:
-            self.stack = True
+            self.img_type = 'list'
             self.images = img
 
         elif len(img.shape) == 3:
-            self.stack = True
+            self.img_type = 'stack'
             self.images = list(img)
         else:
-            self.stack = False
+            self.img_type = 'single'
             self.images = [img, ]
 
         # Params
@@ -61,8 +62,12 @@ class ROI:
         self._fitted = False
 
         # Specify vlim
-        self.vmax = max([np.percentile(i, 99.9) for i in self.images])
-        self.vmin = min([np.percentile(i, 0.1) for i in self.images])
+        if self.img_type == 'stack' or self.img_type == 'single':
+            self.vmax = max([np.percentile(i, 99.9) for i in self.images])
+            self.vmin = min([np.percentile(i, 0.1) for i in self.images])
+        elif self.img_type == 'list':
+            self.vmax = [np.percentile(i, 99.9) for i in self.images]
+            self.vmin = [np.percentile(i, 0.1) for i in self.images]
 
         # Outputs
         self.xpoints = []
@@ -79,7 +84,7 @@ class ROI:
         self.fig.canvas.mpl_connect('key_press_event', self.key_press_callback)
 
         # Stack
-        if self.stack:
+        if self.img_type == 'stack' or self.img_type == 'list':
             plt.subplots_adjust(left=0.25, bottom=0.25)
             self.axframe = plt.axes([0.25, 0.1, 0.65, 0.03])
             if self.end_frame is None:
@@ -100,7 +105,10 @@ class ROI:
         self.ax.clear()
 
         # Plot image
-        self.ax.imshow(self.images[int(i)], cmap='gray', vmin=self.vmin, vmax=self.vmax)
+        if self.img_type == 'stack' or self.img_type == 'single':
+            self.ax.imshow(self.images[int(i)], cmap='gray', vmin=self.vmin, vmax=self.vmax)
+        else:
+            self.ax.imshow(self.images[int(i)], cmap='gray', vmin=self.vmin[int(i)], vmax=self.vmax[int(i)])
 
         # Finalise figure
         self.ax.set_xticks([])
@@ -167,13 +175,109 @@ class ROI:
                 self.roi = []
                 plt.close(self.fig)
 
-        if event.key == ',':
-            self._current_image = max(0, self._current_image - 1)
-            self.draw_frame(self._current_frame)
+    def display_points(self):
+        # Remove existing points
+        try:
+            self._point0.remove()
+            self._points.remove()
+        except (ValueError, AttributeError) as error:
+            pass
 
-        if event.key == '.':
-            self._current_image = min(len(self.images) - 1, self._current_image + 1)
-            self.draw_frame(self._current_frame)
+        # Plot all points
+        if len(self.xpoints) != 0:
+            self._points = self.ax.scatter(self.xpoints, self.ypoints, c='lime', s=10)
+            self._point0 = self.ax.scatter(self.xpoints[0], self.ypoints[0], c='r', s=10)
+
+
+class ROI_jupyter:
+
+    def __init__(self, img, spline=True, start_frame=0, end_frame=None, periodic=True, show_fit=True):
+        self.fig = None
+        self.ax = None
+
+        # Detect if single frame or stack
+        if type(img) is list:
+            self.img_type = 'list'
+            self.images = img
+
+        elif len(img.shape) == 3:
+            self.img_type = 'stack'
+            self.images = list(img)
+        else:
+            self.img_type = 'single'
+            self.images = [img, ]
+
+        # Params
+        self.spline = spline
+        self.start_frame = start_frame
+        self.end_frame = end_frame
+        self.periodic = periodic
+        self.show_fit = show_fit
+
+        # Specify vlim
+        self.vmax = max([np.percentile(i, 99.9) for i in self.images])
+        self.vmin = min([np.percentile(i, 0.1) for i in self.images])
+
+        # Outputs
+        self.xpoints = []
+        self.ypoints = []
+        self.roi = None
+
+    def run(self):
+        self.fig, self.ax = plt.subplots()
+        self.fig.canvas.mpl_connect('button_press_event', self.button_press_callback)
+
+        # Buttons
+        self.ax_undo = plt.axes([0.7, 0.05, 0.1, 0.075])
+        self.b_undo = Button(self.ax_undo, 'Undo')
+        self.b_undo.on_clicked(self._undo)
+        self.ax_save = plt.axes([0.81, 0.05, 0.1, 0.075])
+        self.b_save = Button(self.ax_save, 'Save')
+        self.b_save.on_clicked(self._save)
+
+        # Stack
+        if self.img_type == 'stack' or self.img_type == 'list':
+            @widgets.interact(Frame=(0, len(self.images) - 1, 1))
+            def update(Frame=0):
+                self.draw_frame(Frame)
+        else:
+            self.draw_frame(0)
+
+        self.fig.set_size_inches(4, 4)
+
+    def button_press_callback(self, event):
+        if isinstance(event.inaxes, type(self.ax)):
+            # Add points to list
+            self.xpoints.extend([event.xdata])
+            self.ypoints.extend([event.ydata])
+
+            # Display points
+            self.display_points()
+            self.fig.canvas.draw()
+
+    def _undo(self, _):
+        # Remove last drawn point
+        if len(self.xpoints) != 0:
+            self.xpoints = self.xpoints[:-1]
+            self.ypoints = self.ypoints[:-1]
+        self.display_points()
+        self.fig.canvas.draw()
+
+    def _save(self, _):
+        roi = np.vstack((self.xpoints, self.ypoints)).T
+
+        # Spline
+        if self.spline:
+            self.roi = spline_roi(roi, periodic=self.periodic)
+
+            # Display line
+            if self.show_fit:
+                self._line = self.ax.plot(self.roi[:, 0], self.roi[:, 1], c='b')
+                self.fig.canvas.draw()
+        else:
+            self.roi = roi
+
+        plt.close()
 
     def display_points(self):
         # Remove existing points
@@ -187,6 +291,23 @@ class ROI:
         if len(self.xpoints) != 0:
             self._points = self.ax.scatter(self.xpoints, self.ypoints, c='lime', s=10)
             self._point0 = self.ax.scatter(self.xpoints[0], self.ypoints[0], c='r', s=10)
+
+    def draw_frame(self, i):
+        self.ax.clear()
+
+        # Plot image
+        self.ax.imshow(self.images[int(i)], cmap='gray', vmin=self.vmin, vmax=self.vmax)
+
+        # Finalise figure
+        self.ax.set_xticks([])
+        self.ax.set_yticks([])
+        self.ax.text(0.03, 0.97,
+                     'Specify ROI clockwise from posterior (4 points minimum)'
+                     '\nClick to lay points',
+                     color='white',
+                     transform=self.ax.transAxes, fontsize=8, va='top', ha='left')
+        self.display_points()
+        self.fig.canvas.draw()
 
 
 def spline_roi(roi, periodic=True, s=0):

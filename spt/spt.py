@@ -51,12 +51,14 @@ class SPT:
     Results:
 
     save_path          path to save the results (will create a file called trajectories.csv)
+    name               name of trajectories csv file
 
 
     """
 
     def __init__(self, direc=None, roi=None, threshold=600, feat_size=5, dist=5, separation=None, memory=3, mtl=50,
-                 start_frame=0, end_frame=None, parallel=False, cores=None, save_path=None, invert_roi=False):
+                 start_frame=0, end_frame=None, parallel=False, cores=None, save_path=None, invert_roi=False,
+                 name='trajectories.csv'):
 
         # Import data
         self.direc = direc
@@ -93,6 +95,7 @@ class SPT:
 
         # Saving
         self.save_path = save_path
+        self.name = name
 
         # Output data
         self.features = None
@@ -201,4 +204,4 @@ class SPT:
                 os.mkdir(self.save_path)
 
             # Save tracking data
-            self.trajectories.to_csv(self.save_path + '/trajectories.csv')
+            self.trajectories.to_csv(self.save_path + '/' + self.name)
